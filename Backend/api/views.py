@@ -75,12 +75,9 @@ def auth_login(request):
 @token_required
 def leagues_list_create(request):
     if request.method == 'GET':
-        user_id_param = request.GET.get('user_id')
-        if user_id_param:
-            participations = LeagueParticipant.objects.filter(user_id=user_id_param).select_related('league')
-            leagues = [p.league for p in participations]
-        else:
-            leagues = League.objects.all()
+        user_id_param = request.GET.get('user_id', request.user.id)
+        participations = LeagueParticipant.objects.filter(user_id=user_id_param, is_accepted=True).select_related('league')
+        leagues = [p.league for p in participations]
             
         data = []
         for l in leagues:
@@ -90,7 +87,9 @@ def leagues_list_create(request):
                 'description': l.description,
                 'end_date': l.end_date,
                 'starting_points': l.starting_points,
-                'creator_id': l.creator_id
+                'creator_id': l.creator_id,
+                'participant_count': l.participants.filter(is_accepted=True).count(),
+                'user_points': l.participants.filter(user=request.user, is_accepted=True).first().current_points if l.participants.filter(user=request.user, is_accepted=True).exists() else 0
             })
         return JsonResponse({'leagues': data})
         
@@ -107,7 +106,8 @@ def leagues_list_create(request):
             LeagueParticipant.objects.create(
                 user=request.user,
                 league=league,
-                current_points=league.starting_points
+                current_points=league.starting_points,
+                is_accepted=True
             )
             return JsonResponse({'message': 'League created', 'league_id': league.id}, status=201)
         except Exception as e:
@@ -122,7 +122,7 @@ def league_detail(request, league_id):
         return JsonResponse({'error': 'League not found'}, status=404)
         
     if request.method == 'GET':
-        participants = league.participants.all().select_related('user')
+        participants = league.participants.filter(is_accepted=True).select_related('user')
         parts_data = []
         for p in participants:
             parts_data.append({
@@ -138,7 +138,8 @@ def league_detail(request, league_id):
                 'description': league.description,
                 'end_date': league.end_date,
                 'starting_points': league.starting_points,
-                'creator_id': league.creator_id
+                'creator_id': league.creator_id,
+                'is_creator': league.creator_id == request.user.id
             },
             'participants': parts_data
         })
@@ -190,6 +191,56 @@ def league_invite(request, league_id):
 
 @csrf_exempt
 @token_required
+def leave_league(request, league_id):
+    if request.method == 'POST':
+        try:
+            p = LeagueParticipant.objects.get(league_id=league_id, user=request.user)
+            p.delete()
+            return JsonResponse({'message': 'Leaved successfully'})
+        except LeagueParticipant.DoesNotExist:
+            return JsonResponse({'error': 'Not part of this league'}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@token_required
+def user_invitations(request):
+    if request.method == 'GET':
+        invites = LeagueParticipant.objects.filter(user=request.user, is_accepted=False).select_related('league', 'league__creator')
+        data = []
+        for i in invites:
+            data.append({
+                'league_id': i.league.id,
+                'league_name': i.league.name,
+                'creator_name': i.league.creator.username
+            })
+        return JsonResponse({'invitations': data})
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@token_required
+def respond_invitation(request, league_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            p = LeagueParticipant.objects.get(user=request.user, league_id=league_id, is_accepted=False)
+            if action == 'accept':
+                p.is_accepted = True
+                p.save()
+                return JsonResponse({'message': 'Invitation accepted'})
+            elif action == 'reject':
+                p.delete()
+                return JsonResponse({'message': 'Invitation rejected'})
+            else:
+                return JsonResponse({'error': 'Invalid action'}, status=400)
+        except LeagueParticipant.DoesNotExist:
+            return JsonResponse({'error': 'Invitation not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@token_required
 def users_list(request):
     if request.method == 'GET':
         search_query = request.GET.get('search', '')
@@ -197,6 +248,8 @@ def users_list(request):
             users = User.objects.filter(username__icontains=search_query) | User.objects.filter(first_name__icontains=search_query)
         else:
             users = User.objects.all()
+            
+        users = users.exclude(id=request.user.id)
             
         data = [{'id': u.id, 'username': u.username, 'first_name': u.first_name, 'profile_photo': u.profile_photo} for u in users]
         return JsonResponse({'users': data})
@@ -206,7 +259,7 @@ def users_list(request):
 @token_required
 def user_profile(request):
     if request.method == 'GET':
-        league_count = LeagueParticipant.objects.filter(user=request.user).count()
+        league_count = LeagueParticipant.objects.filter(user=request.user, is_accepted=True).count()
         return JsonResponse({
             'user': {
                 'id': request.user.id,

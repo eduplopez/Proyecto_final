@@ -16,6 +16,7 @@ class LeagueParticipant(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="participations")
     league = models.ForeignKey(League, on_delete=models.CASCADE, related_name="participants")
     current_points = models.IntegerField(default=0)
+    is_accepted = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('user', 'league')
