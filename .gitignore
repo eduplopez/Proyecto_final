@@ -1,9 +1,3 @@
-# Documentos de la IA y temporales
-agents.md
-memory.md
-.gemini/
-scratch/
-
 # Carpetas de editores e IDEs
 .vscode/
 .idea/
@@ -29,3 +23,8 @@ Frontend/*.iml
 .DS_Store
 Thumbs.db
 __pycache__/
+=======
+
+# Documentos a entregar
+memoria_final.md
+memoria_final.pdf
