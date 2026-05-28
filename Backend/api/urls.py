@@ -10,6 +10,9 @@ urlpatterns = [
     path('leagues/<int:league_id>/leave/', views.leave_league),
     path('invitations/', views.user_invitations),
     path('leagues/<int:league_id>/respond/', views.respond_invitation),
+    path('leagues/<int:league_id>/make_admin/<int:user_id>/', views.make_admin),
+    path('leagues/<int:league_id>/events/', views.league_events),
+    path('leagues/<int:league_id>/events/<int:event_id>/', views.update_event),
     path('users/', views.users_list),
     path('users/profile/', views.user_profile),
 ]
