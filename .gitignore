@@ -1,0 +1,34 @@
+# Documentos de la IA y temporales
+agents.md
+memory.md
+.gemini/
+scratch/
+
+# Carpetas de editores e IDEs
+.vscode/
+.idea/
+
+# Backend (Python / Django)
+Backend/__pycache__/
+Backend/*.py[cod]
+Backend/*$py.class
+Backend/venv/
+Backend/env/
+Backend/.venv/
+Backend/db.sqlite3
+
+# Frontend (Android)
+Frontend/.gradle/
+Frontend/build/
+Frontend/app/build/
+Frontend/local.properties
+Frontend/.idea/
+Frontend/*.iml
+
+# Archivos de SO
+.DS_Store
+Thumbs.db
+
+# Documentos a entregar
+memoria_final.md
+memoria_final.pdf
