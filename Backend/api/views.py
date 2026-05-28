@@ -3,7 +3,7 @@ import uuid
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate
-from .models import User, League, LeagueParticipant
+from .models import User, League, LeagueParticipant, Event
 
 def token_required(view_func):
     def wrapper(request, *args, **kwargs):
@@ -123,13 +123,18 @@ def league_detail(request, league_id):
         
     if request.method == 'GET':
         participants = league.participants.filter(is_accepted=True).select_related('user')
+        current_user_p = participants.filter(user=request.user).first()
+        is_current_user_admin = current_user_p.is_admin if current_user_p else False
+        
         parts_data = []
         for p in participants:
             parts_data.append({
                 'user_id': p.user.id,
                 'username': p.user.username,
                 'first_name': p.user.first_name,
-                'points': p.current_points
+                'points': p.current_points,
+                'is_admin': p.is_admin,
+                'is_creator': p.user.id == league.creator_id
             })
         return JsonResponse({
             'league': {
@@ -139,7 +144,8 @@ def league_detail(request, league_id):
                 'end_date': league.end_date,
                 'starting_points': league.starting_points,
                 'creator_id': league.creator_id,
-                'is_creator': league.creator_id == request.user.id
+                'is_creator': league.creator_id == request.user.id,
+                'is_admin': is_current_user_admin
             },
             'participants': parts_data
         })
@@ -276,6 +282,105 @@ def user_profile(request):
             request.user.profile_photo = data.get('profile_photo', request.user.profile_photo)
             request.user.save()
             return JsonResponse({'message': 'Profile updated successfully'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+@token_required
+def make_admin(request, league_id, user_id):
+    if request.method == 'PUT':
+        try:
+            league = League.objects.get(id=league_id)
+            if league.creator != request.user:
+                return JsonResponse({'error': 'Only creator can modify admins'}, status=403)
+            
+            p = LeagueParticipant.objects.get(league=league, user_id=user_id)
+            
+            data = json.loads(request.body)
+            is_admin = data.get('is_admin', True)
+            
+            p.is_admin = is_admin
+            p.save()
+            return JsonResponse({'message': 'Admin status updated'})
+        except (League.DoesNotExist, LeagueParticipant.DoesNotExist):
+            return JsonResponse({'error': 'Not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+@csrf_exempt
+@token_required
+def league_events(request, league_id):
+    try:
+        league = League.objects.get(id=league_id)
+    except League.DoesNotExist:
+        return JsonResponse({'error': 'League not found'}, status=404)
+        
+    if request.method == 'GET':
+        events = Event.objects.filter(league=league)
+        data = [{
+            'id': e.id,
+            'name': e.name,
+            'description': e.description,
+            'event_type': e.event_type,
+            'reward_points': e.reward_points,
+            'creator_id': e.creator.id,
+            'status': e.status,
+            'winner_id': e.winner.id if e.winner else None
+        } for e in events]
+        return JsonResponse({'events': data})
+        
+    elif request.method == 'POST':
+        is_creator = league.creator == request.user
+        is_admin = LeagueParticipant.objects.filter(league=league, user=request.user, is_admin=True).exists()
+        if not (is_creator or is_admin):
+            return JsonResponse({'error': 'Only admins can create events'}, status=403)
+            
+        data = json.loads(request.body)
+        try:
+            event = Event.objects.create(
+                league=league,
+                name=data.get('name'),
+                description=data.get('description', ''),
+                event_type=data.get('event_type'),
+                reward_points=data.get('reward_points', 0),
+                creator=request.user
+            )
+            return JsonResponse({'message': 'Event created', 'event_id': event.id}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+@token_required
+def update_event(request, league_id, event_id):
+    if request.method == 'PUT':
+        try:
+            league = League.objects.get(id=league_id)
+            is_creator = league.creator == request.user
+            is_admin = LeagueParticipant.objects.filter(league=league, user=request.user, is_admin=True).exists()
+            if not (is_creator or is_admin):
+                return JsonResponse({'error': 'Only admins can update events'}, status=403)
+                
+            event = Event.objects.get(id=event_id, league=league)
+            data = json.loads(request.body)
+            
+            winner_id = data.get('winner_id')
+            if winner_id:
+                winner = User.objects.get(id=winner_id)
+                event.winner = winner
+                event.status = 'FINISHED'
+                event.save()
+                
+                p = LeagueParticipant.objects.get(league=league, user=winner)
+                p.current_points += event.reward_points
+                p.save()
+            else:
+                event.name = data.get('name', event.name)
+                event.event_type = data.get('event_type', event.event_type)
+                event.reward_points = data.get('reward_points', event.reward_points)
+                event.save()
+                
+            return JsonResponse({'message': 'Event updated'})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
