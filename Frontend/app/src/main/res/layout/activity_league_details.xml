@@ -175,6 +175,18 @@
                         android:layout_marginBottom="16dp"/>
 
                     <Button
+                        android:id="@+id/btnManageEvents"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Gestionar Eventos"
+                        style="?attr/materialButtonStyle"
+                        app:backgroundTint="@color/elite_primary"
+                        android:textColor="@color/elite_on_primary"
+                        app:cornerRadius="8dp"
+                        android:layout_marginBottom="8dp"
+                        android:visibility="gone"/>
+
+                    <Button
                         android:id="@+id/btnDeleteLeague"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -201,5 +213,16 @@
         app:backgroundTint="@color/elite_primary"
         app:tint="@color/elite_on_primary"
         android:src="@android:drawable/ic_menu_add" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAddEvent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|bottom"
+        android:layout_margin="16dp"
+        app:backgroundTint="@color/elite_primary"
+        app:tint="@color/elite_on_primary"
+        android:src="@android:drawable/ic_menu_today"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

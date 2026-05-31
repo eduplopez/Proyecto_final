@@ -1,17 +1,11 @@
-# Documentos de la IA y temporales
-agents.md
-memory.md
-.gemini/
-scratch/
-
 # Carpetas de editores e IDEs
 .vscode/
 .idea/
 
 # Backend (Python / Django)
-Backend/__pycache__/
-Backend/*.py[cod]
-Backend/*$py.class
+**/__pycache__/
+*.py[cod]
+*$py.class
 Backend/venv/
 Backend/env/
 Backend/.venv/
